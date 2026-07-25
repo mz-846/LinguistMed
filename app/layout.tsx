@@ -10,7 +10,7 @@ const nunitoSans = Nunito_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'NHS Navigator',
+  title: 'MedLingo',
   description: 'Understand your NHS letters in plain language and book your appointment with confidence.',
   generator: 'v0.app',
   icons: {

@@ -18,6 +18,9 @@ export type Language = {
   nativeName: string
   flag: string
   rtl?: boolean
+  /** Override for the ElevenLabs STT hint when `code` isn't a code STT knows
+   *  (e.g. Punjabi Shahmukhi uses 'pnb' but is transcribed as 'pa'). */
+  sttCode?: string
 }
 
 export const LANGUAGES: Language[] = [
@@ -31,7 +34,10 @@ export const LANGUAGES: Language[] = [
   { code: 'fa', name: 'Persian', nativeName: 'فارسی', flag: '🇮🇷', rtl: true },
   { code: 'pl', name: 'Polish', nativeName: 'Polski', flag: '🇵🇱' },
   { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' },
-  { code: 'pa', name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  { code: 'pa', name: 'Punjabi (Gurmukhi)', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  // Ported from the teammate's language list: Punjabi in the Shahmukhi script,
+  // used by Pakistani Punjabi speakers — a large UK community our list missed.
+  { code: 'pnb', sttCode: 'pa', name: 'Punjabi (Shahmukhi)', nativeName: 'پنجابی', flag: '🇵🇰', rtl: true },
   { code: 'ro', name: 'Romanian', nativeName: 'Română', flag: '🇷🇴' },
   { code: 'so', name: 'Somali', nativeName: 'Soomaali', flag: '🇸🇴' },
   { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
@@ -40,7 +46,7 @@ export const LANGUAGES: Language[] = [
   { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true },
 ]
 
-const STORAGE_KEY = 'nhs-navigator-language'
+const STORAGE_KEY = 'medlingo-language'
 
 type LanguageContextValue = {
   language: Language | null

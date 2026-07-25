@@ -25,7 +25,7 @@ export default function LanguageSelectPage() {
           </span>
           <div className="space-y-1">
             <h1 className="text-2xl font-extrabold tracking-tight text-foreground">
-              NHS Navigator
+              MedLingo
             </h1>
             <p className="text-pretty text-base text-muted-foreground">
               Choose the language you&rsquo;re most comfortable with.

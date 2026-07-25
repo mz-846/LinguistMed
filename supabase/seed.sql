@@ -1,4 +1,4 @@
--- NHS Navigator — bulk demo seed data.
+-- MedLingo — bulk demo seed data.
 -- Run this in the Supabase dashboard SQL editor. Safe to re-run: every insert
 -- upserts on the slot id, and re-running resets slots to their seeded
 -- availability (including freeing the demo slot for repeat demos).

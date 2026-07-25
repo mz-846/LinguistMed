@@ -1,4 +1,4 @@
--- NHS Navigator demo schema.
+-- MedLingo demo schema.
 -- Run this in the Supabase dashboard SQL editor (https://supabase.com/dashboard
 -- -> your project -> SQL Editor). Tables created here have RLS disabled by
 -- default, which is fine for this anon-key demo — do not use in production.

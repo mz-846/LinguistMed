@@ -72,7 +72,7 @@ async function performBookingFlow(options: {
 
   const nameRef = findRef(snapshot, 'textbox', /patient/i)
   if (nameRef) {
-    await run(['fill', nameRef, slotDetails.patientName || 'NHS Navigator patient'])
+    await run(['fill', nameRef, slotDetails.patientName || 'MedLingo patient'])
     steps.push({
       step: `Filled in the patient name and checked the slot: ${slotDetails.date} at ${slotDetails.time}, ${slotDetails.surgery}`,
       screenshot: await takeScreenshot(),

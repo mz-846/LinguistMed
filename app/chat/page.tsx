@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
-import { SendHorizontal, Paperclip } from 'lucide-react'
+import { SendHorizontal, Paperclip, Camera, Stethoscope } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
 import { TrustStrip } from '@/components/TrustStrip'
 import { ChatBubble } from '@/components/ChatBubble'
@@ -17,6 +18,7 @@ import {
   type AgentActionStep,
   type AgentActionStatus,
 } from '@/components/AgentActionCard'
+import type { Confidence } from '@/components/ConfidenceTag'
 
 // Demo identifiers for the mock Supabase booking — replace with the signed-in
 // user's profile and a real slot once auth and slot selection exist.
@@ -30,6 +32,8 @@ type Message = {
   /** Text shown in the bubble; for cards, a text summary kept for model context. */
   content: string
   spoken?: boolean
+  /** Model-reported translation confidence (letter explanations). */
+  confidence?: Confidence
   quickReplies?: string[]
   booking?: BookingProposal
   bookingStatus?: BookingStatus
@@ -64,6 +68,7 @@ export default function ChatPage() {
   const [draft, setDraft] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const startedRef = useRef(false)
 
   // Language must be chosen first — bounce back to the select screen.
@@ -160,11 +165,11 @@ export default function ChatPage() {
       content: trimmed,
       spoken,
     }
-    setMessages((current) => {
-      const next = [...current, userMessage]
-      requestAgentReply(next)
-      return next
-    })
+    // Side effects must stay out of the setState updater: React StrictMode
+    // double-invokes updaters in dev, which fired the agent request twice.
+    const next = [...messages, userMessage]
+    setMessages(next)
+    requestAgentReply(next)
   }
 
   function handleSubmit(event: FormEvent) {
@@ -230,6 +235,7 @@ export default function ChatPage() {
           role: 'agent',
           kind: 'text',
           content: parts.join('\n\n'),
+          confidence: data.translation_confidence as Confidence | undefined,
         },
       ])
     } catch (error) {
@@ -401,6 +407,17 @@ export default function ChatPage() {
       <div className="flex w-full max-w-md flex-col">
         <TrustStrip />
 
+        {/* Entry to the live appointment translator mode */}
+        <div className="flex shrink-0 justify-end border-b border-border bg-background px-4 py-2">
+          <Link
+            href="/translate"
+            className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 active:scale-95"
+          >
+            <Stethoscope className="size-3.5" aria-hidden="true" />
+            Talk to your doctor
+          </Link>
+        </div>
+
         {/* Conversation thread */}
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
           {messages.map((message) => {
@@ -431,7 +448,12 @@ export default function ChatPage() {
             }
             return (
               <div key={message.id} className="space-y-2.5">
-                <ChatBubble role={message.role} content={message.content} spoken={message.spoken} />
+                <ChatBubble
+                  role={message.role}
+                  content={message.content}
+                  spoken={message.spoken}
+                  confidence={message.confidence}
+                />
                 {message.role === 'agent' &&
                   message.id === lastMessage?.id &&
                   !typing &&
@@ -449,18 +471,31 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input dock: text fallback + photo attach above the big mic */}
+        {/* Input dock adapted from LangUI's "Prompt Message Input" pattern:
+            one rounded field with icon buttons positioned inside it, restyled
+            to our palette, with the big mic kept below as the primary input. */}
         <div className="shrink-0 space-y-3 border-t border-border bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
-          <form onSubmit={handleSubmit} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={typing}
-              aria-label="Send a photo of a letter"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-primary active:scale-95 disabled:opacity-50"
-            >
-              <Paperclip className="size-4.5" aria-hidden="true" />
-            </button>
+          <form onSubmit={handleSubmit} className="relative">
+            <div className="absolute inset-y-0 left-1.5 flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={typing}
+                aria-label="Attach a photo of a letter"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary active:scale-95 disabled:opacity-50"
+              >
+                <Paperclip className="size-4.5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={typing}
+                aria-label="Take a picture of a letter"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary active:scale-95 disabled:opacity-50"
+              >
+                <Camera className="size-4.5" aria-hidden="true" />
+              </button>
+            </div>
             <input
               type="text"
               value={draft}
@@ -468,13 +503,13 @@ export default function ChatPage() {
               dir="auto"
               placeholder="Type instead…"
               aria-label="Type a message"
-              className="min-w-0 flex-1 rounded-full border border-border bg-card px-4 py-2.5 text-[15px] text-card-foreground shadow-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+              className="block w-full rounded-full border border-border bg-card py-2.5 pl-[5.25rem] pr-12 text-[15px] text-card-foreground shadow-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="submit"
               disabled={!draft.trim() || typing}
               aria-label="Send message"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95 disabled:opacity-40"
+              className="absolute inset-y-0 right-1.5 my-auto flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95 disabled:opacity-40"
             >
               <SendHorizontal className="size-4.5" aria-hidden="true" />
             </button>
@@ -482,7 +517,7 @@ export default function ChatPage() {
 
           <div className="flex justify-center">
             <MicButton
-              languageCode={language.code}
+              languageCode={language.sttCode ?? language.code}
               onTranscript={(text) => sendUserMessage(text, true)}
               onError={handleMicError}
               disabled={typing}
@@ -490,8 +525,20 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Attach an existing photo: plain picker, no capture attribute. */}
         <input
           ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={handlePhotoChange}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+        {/* Take a picture: capture opens the rear camera directly on mobile;
+            desktop browsers ignore it and fall back to the file picker. */}
+        <input
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"

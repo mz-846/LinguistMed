@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
 
 // This endpoint must only ever be called from an explicit "Confirm booking"
 // click by the user — never automatically.
@@ -73,6 +74,8 @@ export async function POST(request: Request) {
       { status: 500 },
     )
   }
+
+  void logAudit('book_appointment', { slot_id: slotId }, profileId)
 
   return NextResponse.json({ booking, slot })
 }

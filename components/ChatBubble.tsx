@@ -4,15 +4,22 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { HeartPulse, Mic, Volume2, Square, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConfidenceTag, type Confidence } from '@/components/ConfidenceTag'
 
 type ChatBubbleProps = {
   role: 'agent' | 'user'
   content: string
   /** True when the user message came from voice rather than typing. */
   spoken?: boolean
+  /** Model-reported translation confidence, shown as a tag under the text. */
+  confidence?: Confidence
 }
 
-export function ChatBubble({ role, content, spoken = false }: ChatBubbleProps) {
+// Bubble layout adapted from LangUI's "Prompt Messages" component
+// (github.com/CommandCodeAI/langui, MIT): avatar-side square corner on the
+// bubble and an action rail sitting outside the bubble, restyled to our
+// calm sky/white palette and driven by our own role/spoken/confidence props.
+export function ChatBubble({ role, content, spoken = false, confidence }: ChatBubbleProps) {
   const isAgent = role === 'agent'
 
   return (
@@ -20,7 +27,7 @@ export function ChatBubble({ role, content, spoken = false }: ChatBubbleProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className={cn('flex items-end gap-2', isAgent ? 'justify-start' : 'justify-end')}
+      className={cn('flex items-start gap-2', !isAgent && 'flex-row-reverse')}
     >
       {isAgent && (
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -30,21 +37,24 @@ export function ChatBubble({ role, content, spoken = false }: ChatBubbleProps) {
 
       <div
         className={cn(
-          'flex max-w-[80%] flex-col gap-1 rounded-2xl px-4 py-3 shadow-sm',
+          'flex max-w-[80%] flex-col gap-1.5 p-4 shadow-sm',
           isAgent
-            ? 'rounded-bl-md bg-sky-50 text-slate-800'
-            : 'rounded-br-md border border-border bg-card text-card-foreground',
+            ? 'rounded-b-xl rounded-tr-xl bg-sky-50 text-slate-800'
+            : 'rounded-b-xl rounded-tl-xl border border-border bg-card text-card-foreground',
         )}
       >
         <p dir="auto" className="whitespace-pre-line text-[15px] leading-relaxed">
           {content}
         </p>
-        <div className="flex items-center gap-2 self-end">
-          {spoken && !isAgent && (
-            <Mic className="size-3 text-muted-foreground" aria-label="Spoken message" />
-          )}
-          {isAgent && <SpeakButton text={content} />}
-        </div>
+        {confidence && <ConfidenceTag confidence={confidence} />}
+      </div>
+
+      {/* Action rail beside the bubble, as in LangUI's reply rows */}
+      <div className="mt-1 flex shrink-0 flex-col gap-2 text-slate-400">
+        {isAgent && <SpeakButton text={content} />}
+        {!isAgent && spoken && (
+          <Mic className="size-3.5" aria-label="Spoken message" />
+        )}
       </div>
     </motion.div>
   )

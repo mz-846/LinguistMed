@@ -3,19 +3,21 @@
 import { motion } from 'framer-motion'
 import { HeartPulse } from 'lucide-react'
 
+// Structure follows LangUI's message rows (avatar + square-cornered bubble),
+// with our animated three-dot "thinking" content inside.
 export function TypingIndicator() {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="flex items-end gap-2"
+      className="flex items-start gap-2"
     >
       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
         <HeartPulse className="size-4" aria-hidden="true" />
       </span>
       <div
-        className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-sky-50 px-4 py-3.5 shadow-sm"
+        className="flex items-center gap-1.5 rounded-b-xl rounded-tr-xl bg-sky-50 px-4 py-4 shadow-sm"
         role="status"
         aria-label="Assistant is typing"
       >
