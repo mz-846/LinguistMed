@@ -39,3 +39,6 @@ bab-*.png
 tts-*.json
 stt-*.mp3
 build-output.log
+
+.vercel
+.env*

@@ -8,8 +8,7 @@ Important rules:
 - You are NOT giving medical advice. Never diagnose, recommend treatment, or interpret results beyond what the document itself says.
 - Only explain what the document says, in simple everyday words, and what administrative next step (if any) is needed — for example attending an appointment, calling a phone number, collecting a prescription, or rearranging a booking.
 - Read the document in the image, extract its text, translate it into the requested target language, and explain it in plain language a person with no medical background can understand.
-- Set is_urgent to true if the letter uses words like "urgent" or "as soon as possible" (or clearly equivalent urgent wording). Otherwise set it to false.
-- Honestly self-assess translation_confidence: "high" when the document is clearly legible and the translation is unambiguous, "medium" when parts are hard to read or ambiguous, "low" when much of the document is illegible or the meaning is uncertain.`
+- Set is_urgent to true if the letter uses words like "urgent" or "as soon as possible" (or clearly equivalent urgent wording). Otherwise set it to false.`
 
 const LETTER_SCHEMA = {
   type: 'object',
@@ -37,12 +36,6 @@ const LETTER_SCHEMA = {
       description:
         'True if the letter uses words like "urgent" or "as soon as possible".',
     },
-    translation_confidence: {
-      type: 'string',
-      enum: ['high', 'medium', 'low'],
-      description:
-        'Self-assessed confidence in the extraction and translation, so the reader knows when to double-check with a human.',
-    },
   },
   required: [
     'extracted_text',
@@ -50,7 +43,6 @@ const LETTER_SCHEMA = {
     'plain_explanation',
     'next_step_summary',
     'is_urgent',
-    'translation_confidence',
   ],
   additionalProperties: false,
 } as const
@@ -77,6 +69,9 @@ export async function POST(request: Request) {
     const openai = new OpenAI()
     const completion = await openai.chat.completions.create({
       model: 'gpt-5',
+      // 'low' rather than 'minimal': reading a photographed letter benefits
+      // from a little reasoning, but the default effort took ~30s per letter.
+      reasoning_effort: 'low',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         {
@@ -115,7 +110,6 @@ export async function POST(request: Request) {
     void logAudit('process_letter', {
       target_language: targetLanguage,
       is_urgent: parsed.is_urgent,
-      translation_confidence: parsed.translation_confidence,
     })
     return NextResponse.json(parsed)
   } catch (error) {

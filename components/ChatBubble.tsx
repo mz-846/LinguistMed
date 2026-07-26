@@ -4,22 +4,19 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { HeartPulse, Mic, Volume2, Square, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ConfidenceTag, type Confidence } from '@/components/ConfidenceTag'
 
 type ChatBubbleProps = {
   role: 'agent' | 'user'
   content: string
   /** True when the user message came from voice rather than typing. */
   spoken?: boolean
-  /** Model-reported translation confidence, shown as a tag under the text. */
-  confidence?: Confidence
 }
 
 // Bubble layout adapted from LangUI's "Prompt Messages" component
 // (github.com/CommandCodeAI/langui, MIT): avatar-side square corner on the
 // bubble and an action rail sitting outside the bubble, restyled to our
-// calm sky/white palette and driven by our own role/spoken/confidence props.
-export function ChatBubble({ role, content, spoken = false, confidence }: ChatBubbleProps) {
+// calm sky/white palette and driven by our own role/spoken props.
+export function ChatBubble({ role, content, spoken = false }: ChatBubbleProps) {
   const isAgent = role === 'agent'
 
   return (
@@ -46,7 +43,6 @@ export function ChatBubble({ role, content, spoken = false, confidence }: ChatBu
         <p dir="auto" className="whitespace-pre-line text-[15px] leading-relaxed">
           {content}
         </p>
-        {confidence && <ConfidenceTag confidence={confidence} />}
       </div>
 
       {/* Action rail beside the bubble, as in LangUI's reply rows */}

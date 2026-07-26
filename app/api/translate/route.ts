@@ -15,20 +15,13 @@ const TRANSLATION_SCHEMA = {
       type: 'string',
       description: 'The translation of the source text, and nothing else.',
     },
-    confidence: {
-      type: 'string',
-      enum: ['high', 'medium', 'low'],
-      description:
-        'Self-assessed translation confidence. high = clear source, unambiguous translation. medium = minor ambiguity or possible transcription noise. low = the source is unclear, fragmentary, or could mean several different things.',
-    },
   },
-  required: ['translated_text', 'confidence'],
+  required: ['translated_text'],
   additionalProperties: false,
 } as const
 
 type CacheRow = {
   translated_text: string
-  confidence: 'high' | 'medium' | 'low' | null
 }
 
 export async function POST(request: Request) {
@@ -61,7 +54,7 @@ export async function POST(request: Request) {
   try {
     const { data, error } = await getSupabase()
       .from('translation_cache')
-      .select('translated_text, confidence')
+      .select('translated_text')
       .eq('source_hash', sourceHash)
       .eq('target_language', targetLanguage)
       .maybeSingle<CacheRow>()
@@ -76,7 +69,6 @@ export async function POST(request: Request) {
       })
       return NextResponse.json({
         translatedText: data.translated_text,
-        confidence: data.confidence ?? 'medium',
         cached: true,
       })
     }
@@ -88,6 +80,8 @@ export async function POST(request: Request) {
     const openai = new OpenAI()
     const completion = await openai.chat.completions.create({
       model: 'gpt-5',
+      // Live-conversation mode: skip deliberate reasoning for speed.
+      reasoning_effort: 'minimal',
       messages: [
         {
           role: 'system',
@@ -96,8 +90,7 @@ export async function POST(request: Request) {
 Rules:
 - Translate ONLY the text provided. Do not add explanations, advice, or commentary.
 - The source is a speech-to-text transcript, so it may contain transcription noise; translate the most plausible intended meaning.
-- Maintain medical accuracy. Keep medication names and dosages exactly as stated.
-- Honestly self-assess your confidence so the patient knows when to double-check with a human interpreter.`,
+- Maintain medical accuracy. Keep medication names and dosages exactly as stated.`,
         },
         { role: 'user', content: text },
       ],
@@ -119,10 +112,7 @@ Rules:
       )
     }
 
-    const parsed = JSON.parse(content) as {
-      translated_text: string
-      confidence: 'high' | 'medium' | 'low'
-    }
+    const parsed = JSON.parse(content) as { translated_text: string }
 
     // Populate the cache for next time; failure is non-fatal.
     try {
@@ -131,7 +121,6 @@ Rules:
         target_language: targetLanguage,
         source_text: text,
         translated_text: parsed.translated_text,
-        confidence: parsed.confidence,
       })
       if (error) console.warn('translation_cache insert failed:', error.message)
     } catch (error) {
@@ -143,12 +132,10 @@ Rules:
       target_language: targetLanguage,
       characters: text.length,
       cached: false,
-      confidence: parsed.confidence,
     })
 
     return NextResponse.json({
       translatedText: parsed.translated_text,
-      confidence: parsed.confidence,
       cached: false,
     })
   } catch (error) {

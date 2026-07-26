@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { AnimatePresence } from 'framer-motion'
 import { SendHorizontal, Paperclip, Camera, Stethoscope } from 'lucide-react'
 import { useLanguage } from '@/context/LanguageContext'
-import { TrustStrip } from '@/components/TrustStrip'
 import { ChatBubble } from '@/components/ChatBubble'
 import { TypingIndicator } from '@/components/TypingIndicator'
 import { QuickReplyChips } from '@/components/QuickReplyChips'
@@ -18,7 +17,6 @@ import {
   type AgentActionStep,
   type AgentActionStatus,
 } from '@/components/AgentActionCard'
-import type { Confidence } from '@/components/ConfidenceTag'
 
 // Demo identifiers for the mock Supabase booking — replace with the signed-in
 // user's profile and a real slot once auth and slot selection exist.
@@ -32,8 +30,6 @@ type Message = {
   /** Text shown in the bubble; for cards, a text summary kept for model context. */
   content: string
   spoken?: boolean
-  /** Model-reported translation confidence (letter explanations). */
-  confidence?: Confidence
   quickReplies?: string[]
   booking?: BookingProposal
   bookingStatus?: BookingStatus
@@ -235,7 +231,6 @@ export default function ChatPage() {
           role: 'agent',
           kind: 'text',
           content: parts.join('\n\n'),
-          confidence: data.translation_confidence as Confidence | undefined,
         },
       ])
     } catch (error) {
@@ -405,8 +400,6 @@ export default function ChatPage() {
   return (
     <div className="flex h-dvh justify-center bg-background">
       <div className="flex w-full max-w-md flex-col">
-        <TrustStrip />
-
         {/* Entry to the live appointment translator mode */}
         <div className="flex shrink-0 justify-end border-b border-border bg-background px-4 py-2">
           <Link
@@ -448,12 +441,7 @@ export default function ChatPage() {
             }
             return (
               <div key={message.id} className="space-y-2.5">
-                <ChatBubble
-                  role={message.role}
-                  content={message.content}
-                  spoken={message.spoken}
-                  confidence={message.confidence}
-                />
+                <ChatBubble role={message.role} content={message.content} spoken={message.spoken} />
                 {message.role === 'agent' &&
                   message.id === lastMessage?.id &&
                   !typing &&

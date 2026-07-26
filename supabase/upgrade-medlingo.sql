@@ -11,10 +11,13 @@ create table if not exists translation_cache (
   target_language text not null,
   source_text text not null,
   translated_text text not null,
-  confidence text check (confidence in ('high', 'medium', 'low')),
   created_at timestamptz not null default now(),
   unique (source_hash, target_language)
 );
+
+-- Cleanup in case an earlier version of this script already created the
+-- table with a confidence column (feature since removed).
+alter table translation_cache drop column if exists confidence;
 
 create table if not exists audit_log (
   id uuid primary key default gen_random_uuid(),

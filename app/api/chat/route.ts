@@ -103,6 +103,9 @@ export async function POST(request: Request) {
     const openai = new OpenAI()
     const completion = await openai.chat.completions.create({
       model: 'gpt-5',
+      // Conversational turns need to feel snappy; minimal reasoning is
+      // plenty for reply/quick-replies/action selection.
+      reasoning_effort: 'minimal',
       messages: [
         { role: 'system', content: buildSystemPrompt(language) },
         ...chatMessages.map((message) => ({

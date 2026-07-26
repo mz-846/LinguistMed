@@ -197,15 +197,17 @@ async function runLocalFlow(options: {
 }
 
 // ---------------------------------------------------------------------------
-// Vercel Sandbox driver: the pattern from the agent-browser docs. Requires
-// Vercel credentials (VERCEL_OIDC_TOKEN, or VERCEL_TOKEN + VERCEL_TEAM_ID +
-// VERCEL_PROJECT_ID) and a bookingUrl reachable from the public internet.
+// Vercel Sandbox driver: the pattern from the agent-browser docs. On deployed
+// Vercel functions @vercel/sandbox authenticates automatically via OIDC (the
+// token arrives per-request, NOT as an env var — so never sniff for
+// VERCEL_OIDC_TOKEN: it is absent in production and, worse, `vercel env pull`
+// writes a dev-scoped one into .env.local, which would break local runs).
+// The choice is purely by platform: serverless has no Chrome, so deployed
+// runs need the sandbox; the sandbox cannot reach localhost, so local runs
+// need the local driver.
 // ---------------------------------------------------------------------------
-function hasVercelSandboxCredentials(): boolean {
-  return Boolean(
-    process.env.VERCEL_OIDC_TOKEN ||
-      (process.env.VERCEL_TOKEN && process.env.VERCEL_TEAM_ID && process.env.VERCEL_PROJECT_ID),
-  )
+function runningOnVercel(): boolean {
+  return process.env.VERCEL === '1'
 }
 
 async function runSandboxFlow(options: {
@@ -283,9 +285,7 @@ export async function POST(request: Request) {
   const flowOptions = { bookingUrl, slotDetails, userConfirmed }
 
   try {
-    // Prefer the Vercel Sandbox when credentials exist (deployed usage);
-    // otherwise drive a local browser (the sandbox cannot reach localhost).
-    const result = hasVercelSandboxCredentials()
+    const result = runningOnVercel()
       ? await runSandboxFlow(flowOptions)
       : await runLocalFlow(flowOptions)
 
