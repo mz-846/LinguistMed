@@ -65,7 +65,9 @@ async function performBookingFlow(options: {
   const steps: TraceStep[] = []
 
   await run(['open', bookingUrl])
-  await run(['wait', '--load', 'networkidle'])
+  // 'load' instead of 'networkidle': the booking page is a small static page,
+  // and networkidle costs an extra idle-detection window on every run.
+  await run(['wait', '--load', 'load'])
   steps.push({ step: 'Opened the booking page', screenshot: await takeScreenshot() })
 
   const snapshot = await run(['snapshot', '-i'])

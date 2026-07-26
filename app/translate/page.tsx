@@ -264,6 +264,7 @@ type Speaker = 'patient' | 'doctor'
 
 type Exchange = {
   id: string
+  speaker: Speaker
   original: string
   translated?: string
   status: 'translating' | 'done' | 'error'
@@ -275,18 +276,16 @@ function makeId() {
   return `exchange-${nextId}`
 }
 
-// Live "at your appointment" translator with a conversation tab per party:
-// the patient speaks their language and gets English for the doctor; the
-// doctor speaks English and gets the patient's language back.
+// Live "at your appointment" translator: one shared conversation thread for
+// both parties. The patient speaks their language and gets English for the
+// doctor; the doctor speaks English and gets the patient's language back.
 // Deliberately a direct transcribe→translate pipeline — no agent loop.
 export default function TranslatePage() {
   const router = useRouter()
   const { language, ready } = useLanguage()
-  const [tab, setTab] = useState<Speaker>('patient')
-  const [exchanges, setExchanges] = useState<Record<Speaker, Exchange[]>>({
-    patient: [],
-    doctor: [],
-  })
+  // Who is about to speak — controls the mic's STT language and direction.
+  const [speaker, setSpeaker] = useState<Speaker>('patient')
+  const [exchanges, setExchanges] = useState<Exchange[]>([])
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -296,19 +295,19 @@ export default function TranslatePage() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [exchanges, tab])
+  }, [exchanges])
 
-  async function handleTranscript(speaker: Speaker, text: string) {
+  async function handleTranscript(from: Speaker, text: string) {
     if (!language) return
     setError(null)
     const id = makeId()
-    setExchanges((current) => ({
+    setExchanges((current) => [
       ...current,
-      [speaker]: [...current[speaker], { id, original: text, status: 'translating' }],
-    }))
+      { id, speaker: from, original: text, status: 'translating' },
+    ])
 
     const direction =
-      speaker === 'patient'
+      from === 'patient'
         ? { sourceLanguage: language.name, targetLanguage: 'English' }
         : { sourceLanguage: 'English', targetLanguage: language.name }
 
@@ -322,29 +321,26 @@ export default function TranslatePage() {
       if (!response.ok || !data?.translatedText) {
         throw new Error(data?.error ?? 'Translation failed')
       }
-      setExchanges((current) => ({
-        ...current,
-        [speaker]: current[speaker].map((exchange) =>
+      setExchanges((current) =>
+        current.map((exchange) =>
           exchange.id === id
             ? { ...exchange, translated: data.translatedText, status: 'done' }
             : exchange,
         ),
-      }))
+      )
     } catch {
-      setExchanges((current) => ({
-        ...current,
-        [speaker]: current[speaker].map((exchange) =>
+      setExchanges((current) =>
+        current.map((exchange) =>
           exchange.id === id ? { ...exchange, status: 'error' } : exchange,
         ),
-      }))
+      )
     }
   }
 
   if (!language) return null
 
   const t = STRINGS[language.code] ?? STRINGS.en
-  const activeExchanges = exchanges[tab]
-  const translating = activeExchanges.some((exchange) => exchange.status === 'translating')
+  const translating = exchanges.some((exchange) => exchange.status === 'translating')
 
   return (
     <div className="flex h-dvh justify-center bg-background">
@@ -364,35 +360,35 @@ export default function TranslatePage() {
           </div>
         </div>
 
-        {/* One conversation tab per party */}
+        {/* Speaker toggle: selects who talks next, the thread stays shared */}
         <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-border bg-background px-4 py-2.5">
           <TabButton
-            active={tab === 'patient'}
-            onClick={() => setTab('patient')}
+            active={speaker === 'patient'}
+            onClick={() => setSpeaker('patient')}
             icon={<User className="size-4" aria-hidden="true" />}
             title={t.patient}
             subtitle={language.nativeName}
           />
           <TabButton
-            active={tab === 'doctor'}
-            onClick={() => setTab('doctor')}
+            active={speaker === 'doctor'}
+            onClick={() => setSpeaker('doctor')}
             icon={<Stethoscope className="size-4" aria-hidden="true" />}
             title={t.doctor}
             subtitle="English"
           />
         </div>
 
-        {/* Running list of exchanges for the active tab */}
+        {/* The whole conversation, both parties, in order */}
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
-          {activeExchanges.length === 0 && (
+          {exchanges.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <p dir="auto" className="text-lg font-medium text-foreground">
-                {tab === 'patient' ? language.nativeName : t.doctor}
+                {speaker === 'patient' ? language.nativeName : t.doctor}
               </p>
               <p dir="auto" className="max-w-[30ch] text-sm text-muted-foreground">
-                {tab === 'patient' ? t.patientHint : t.doctorHint}
+                {speaker === 'patient' ? t.patientHint : t.doctorHint}
               </p>
-              {tab === 'doctor' && language.code !== 'en' && (
+              {speaker === 'doctor' && language.code !== 'en' && (
                 <p className="max-w-[34ch] text-xs text-muted-foreground/70">
                   Doctor: tap the microphone and speak in English.
                 </p>
@@ -400,50 +396,78 @@ export default function TranslatePage() {
             </div>
           )}
 
-          {activeExchanges.map((exchange) => (
-            <motion.div
-              key={exchange.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-              className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm"
-            >
-              <p dir="auto" className="text-sm leading-relaxed text-muted-foreground">
-                {exchange.original}
-              </p>
-              <div className="border-t border-border" />
-
-              {exchange.status === 'translating' && (
-                <p
-                  dir="auto"
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
+          {exchanges.map((exchange) => {
+            const isPatient = exchange.speaker === 'patient'
+            return (
+              <motion.div
+                key={exchange.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className={cn('flex', isPatient ? 'justify-end' : 'justify-start')}
+              >
+                <div
+                  className={cn(
+                    'w-[88%] space-y-3 rounded-xl border p-4 shadow-sm',
+                    isPatient
+                      ? 'rounded-br-md border-border bg-card'
+                      : 'rounded-bl-md border-sky-100 bg-sky-50',
+                  )}
                 >
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  {t.translating}
-                </p>
-              )}
-              {exchange.status === 'error' && (
-                <p dir="auto" className="text-sm text-red-600">
-                  ⚠️ {t.failed}
-                </p>
-              )}
-              {exchange.status === 'done' && exchange.translated && (
-                <div className="space-y-3">
-                  {/* Large enough to angle the phone toward the other person */}
-                  <p dir="auto" className="text-2xl font-semibold leading-snug text-slate-900">
-                    {exchange.translated}
+                  {/* Who said it */}
+                  <p
+                    dir="auto"
+                    className={cn(
+                      'flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide',
+                      isPatient ? 'text-muted-foreground' : 'text-sky-700',
+                    )}
+                  >
+                    {isPatient ? (
+                      <User className="size-3" aria-hidden="true" />
+                    ) : (
+                      <Stethoscope className="size-3" aria-hidden="true" />
+                    )}
+                    {isPatient ? t.patient : t.doctor}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ReadAloudButton
-                      text={exchange.translated}
-                      label={t.readAloud}
-                      stopLabel={t.stop}
-                    />
-                  </div>
+
+                  <p dir="auto" className="text-sm leading-relaxed text-muted-foreground">
+                    {exchange.original}
+                  </p>
+                  <div className={cn('border-t', isPatient ? 'border-border' : 'border-sky-100')} />
+
+                  {exchange.status === 'translating' && (
+                    <p
+                      dir="auto"
+                      className="flex items-center gap-2 text-sm text-muted-foreground"
+                    >
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      {t.translating}
+                    </p>
+                  )}
+                  {exchange.status === 'error' && (
+                    <p dir="auto" className="text-sm text-red-600">
+                      ⚠️ {t.failed}
+                    </p>
+                  )}
+                  {exchange.status === 'done' && exchange.translated && (
+                    <div className="space-y-3">
+                      {/* Large enough to angle the phone toward the other person */}
+                      <p dir="auto" className="text-2xl font-semibold leading-snug text-slate-900">
+                        {exchange.translated}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <ReadAloudButton
+                          text={exchange.translated}
+                          label={t.readAloud}
+                          stopLabel={t.stop}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </motion.div>
-          ))}
+              </motion.div>
+            )
+          })}
           <div ref={bottomRef} />
         </div>
 
@@ -451,9 +475,9 @@ export default function TranslatePage() {
         <div className="shrink-0 space-y-2 border-t border-border bg-background/95 px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-4 backdrop-blur">
           <div className="flex justify-center">
             <MicButton
-              key={tab}
-              languageCode={tab === 'patient' ? (language.sttCode ?? language.code) : 'en'}
-              onTranscript={(text) => handleTranscript(tab, text)}
+              key={speaker}
+              languageCode={speaker === 'patient' ? (language.sttCode ?? language.code) : 'en'}
+              onTranscript={(text) => handleTranscript(speaker, text)}
               onError={(message) => setError(message)}
               disabled={translating}
             />
